@@ -935,6 +935,10 @@ function AuthScreen(p) {
         <div style={{fontSize:10,color:pc,fontWeight:700,letterSpacing:0.5}}>{pl}</div>
       </div>
     </div>
+    {(isQP||isCorpPath)&&<div style={{margin:"14px 20px 0",maxWidth:460,width:"calc(100% - 40px)",marginLeft:"auto",marginRight:"auto",background:pc+"14",border:"1px solid "+pc+"40",borderRadius:10,padding:"10px 14px",fontSize:11.5,color:th.text,lineHeight:1.5,display:"flex",gap:8,alignItems:"flex-start"}}>
+      <span style={{fontSize:14}}>🔒</span>
+      <span><b>Private login.</b> This access point is restricted to authorized {isQP?"All-Pro QC":isSC?"Sonic Corporate":isAC?"All-Pro Corporate":"Sonic Platform Admin"} personnel only. Unauthorized access attempts may be logged and reviewed.</span>
+    </div>}
     <div style={{flex:1,overflowY:"auto",padding:"24px 20px 48px",maxWidth:460,width:"100%",margin:"0 auto"}}>
       {step==="form"&&<div>
         <div style={{display:"flex",background:th.inp,borderRadius:10,padding:4,marginBottom:22}}>

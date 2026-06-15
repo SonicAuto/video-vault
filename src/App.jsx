@@ -1837,17 +1837,17 @@ export default function App() {
   var storeId=user?(user.activeStore||user.dealerId||"massey-cadillac-orlando"):"massey-cadillac-orlando";
   var dealer=SONIC_DEALERS.find(function(d){return d.id===storeId;})||{};
 
+  // ── Screen: Auth ────────────────────────────────────────────────────────────
+  if(screen==="auth"){
+    return <AuthScreen th={th} path={authPath} preselectedStore={preselectedStore}
+      onBack={function(){setScreen("home");}} onLogin={handleLogin}/>;
+  }
+
   // ── Screen: Home ────────────────────────────────────────────────────────────
   if(!user||screen==="home"){
     return <HomeScreen th={th} theme={theme}
       onToggle={function(){setTheme(function(t){return t==="dark"?"light":"dark";});}}
       onPath={function(path){setAuthPath(path);setScreen("auth");}}/>;
-  }
-
-  // ── Screen: Auth ────────────────────────────────────────────────────────────
-  if(screen==="auth"){
-    return <AuthScreen th={th} path={authPath} preselectedStore={preselectedStore}
-      onBack={function(){setScreen("home");}} onLogin={handleLogin}/>;
   }
 
   if(showTerms)return <TermsScreen th={th} onAccept={handleTermsAccept}/>;
