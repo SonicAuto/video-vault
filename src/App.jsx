@@ -83,7 +83,11 @@ import {
   setCache,
   setUserDeactivated,
   setUserBanned,
-  deleteUserAccount} from './vaultCore.jsx';
+  deleteUserAccount,
+  saveVideoToDB,
+  deleteVideoFromDB,
+  updateVideoInDB,
+  loadAllVideosFromDB} from './vaultCore.jsx';
 import {
   CameraScreen,
   InventoryScreen,
@@ -1509,6 +1513,27 @@ export default function App() {
     if(showSessionTimeout)setShowSessionTimeout(false);
   }
 
+  // Load any videos persisted in IndexedDB (real uploads survive logout/reload).
+  useEffect(function(){
+    if(!user)return;
+    var alive=true;
+    loadAllVideosFromDB().then(function(saved){
+      if(!alive||!saved||Object.keys(saved).length===0)return;
+      setVideos(function(prev){
+        var merged=Object.assign({},prev);
+        Object.keys(saved).forEach(function(vin){
+          var existing=merged[vin]||[];
+          var existingIds={};
+          existing.forEach(function(v){existingIds[v.id]=true;});
+          var add=saved[vin].filter(function(v){return !existingIds[v.id];});
+          merged[vin]=add.concat(existing);
+        });
+        return merged;
+      });
+    });
+    return function(){alive=false;};
+  },[user&&user.email]);
+
   // Persist app state (logins, accounts, reminders, audit log, ack flags, etc.)
   // to localStorage so it survives reloads/restarts on this device.
   useEffect(function(){
@@ -1747,6 +1772,7 @@ export default function App() {
       n[vin]=[vid].concat(n[vin]);
       return n;
     });
+    if(!vid.isDemo){ saveVideoToDB(vin,vid); }
     addAudit({type:"video_upload",user:user.email,vin:vin,store:user.dealerId||user.activeStore,videoType:vid.videoType,vidName:vid.name,uploader:vid.uploader,role:vid.role,duration:vid.duration||0});
 
     // Notify sales staff who recently viewed this vehicle (if All-Pro uploaded)
@@ -1772,6 +1798,9 @@ export default function App() {
       (videos[vin]||[]).forEach(function(v){if(isOldMine(v))removed++;});
     });
     if(removed>0){
+      Object.keys(videos).forEach(function(vin){
+        (videos[vin]||[]).forEach(function(v){if(isOldMine(v))deleteVideoFromDB(v.id);});
+      });
       setVideos(function(prev){
         var n={};
         Object.keys(prev).forEach(function(vin){
@@ -1789,6 +1818,7 @@ export default function App() {
       n[vin]=(n[vin]||[]).filter(function(v){return v.id!==vidId;});
       return n;
     });
+    deleteVideoFromDB(vidId);
     addAudit({type:"video_delete",user:user.email,vin:vin});
   }
 
@@ -1798,6 +1828,7 @@ export default function App() {
       n[vin]=(n[vin]||[]).map(function(v){return v.id===vidId?Object.assign({},v,{notes:note}):v;});
       return n;
     });
+    updateVideoInDB(vidId,{notes:note});
   }
 
   function handleSend(vin,vid,sendData){

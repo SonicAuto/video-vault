@@ -79,6 +79,97 @@ function persistDB(){
   }catch(e){ /* storage full or unavailable — fail silently */ }
 }
 loadDB();
+
+// ─── Persistent video storage (IndexedDB — handles Blobs + large size) ───────
+// Videos contain Blob objects and can be tens of MB, so they can't live in
+// localStorage. We store each video record (including its blob) in IndexedDB,
+// keyed by video id, with the vehicle VIN saved alongside for grouping.
+var VIDEO_DB_NAME = "videovault_videos";
+var VIDEO_STORE = "videos";
+function openVideoDB(){
+  return new Promise(function(resolve,reject){
+    try{
+      if(typeof indexedDB==="undefined"){resolve(null);return;}
+      var req=indexedDB.open(VIDEO_DB_NAME,1);
+      req.onupgradeneeded=function(e){
+        var db=e.target.result;
+        if(!db.objectStoreNames.contains(VIDEO_STORE))db.createObjectStore(VIDEO_STORE,{keyPath:"id"});
+      };
+      req.onsuccess=function(e){resolve(e.target.result);};
+      req.onerror=function(){resolve(null);};
+    }catch(e){resolve(null);}
+  });
+}
+function saveVideoToDB(vin,vid){
+  return openVideoDB().then(function(db){
+    if(!db)return false;
+    return new Promise(function(resolve){
+      try{
+        var tx=db.transaction(VIDEO_STORE,"readwrite");
+        var rec=Object.assign({},vid,{vin:vin});
+        tx.objectStore(VIDEO_STORE).put(rec);
+        tx.oncomplete=function(){resolve(true);};
+        tx.onerror=function(){resolve(false);};
+      }catch(e){resolve(false);}
+    });
+  });
+}
+function deleteVideoFromDB(vidId){
+  return openVideoDB().then(function(db){
+    if(!db)return false;
+    return new Promise(function(resolve){
+      try{
+        var tx=db.transaction(VIDEO_STORE,"readwrite");
+        tx.objectStore(VIDEO_STORE).delete(vidId);
+        tx.oncomplete=function(){resolve(true);};
+        tx.onerror=function(){resolve(false);};
+      }catch(e){resolve(false);}
+    });
+  });
+}
+function updateVideoInDB(vidId,changes){
+  return openVideoDB().then(function(db){
+    if(!db)return false;
+    return new Promise(function(resolve){
+      try{
+        var tx=db.transaction(VIDEO_STORE,"readwrite");
+        var store=tx.objectStore(VIDEO_STORE);
+        var g=store.get(vidId);
+        g.onsuccess=function(){
+          var rec=g.result; if(rec){ Object.assign(rec,changes); store.put(rec); }
+        };
+        tx.oncomplete=function(){resolve(true);};
+        tx.onerror=function(){resolve(false);};
+      }catch(e){resolve(false);}
+    });
+  });
+}
+// Returns videos grouped by VIN: { vin: [vid, vid, ...] }
+function loadAllVideosFromDB(){
+  return openVideoDB().then(function(db){
+    if(!db)return {};
+    return new Promise(function(resolve){
+      try{
+        var tx=db.transaction(VIDEO_STORE,"readonly");
+        var req=tx.objectStore(VIDEO_STORE).getAll();
+        req.onsuccess=function(){
+          var byVin={};
+          (req.result||[]).forEach(function(rec){
+            var vin=rec.vin||"_";
+            if(!byVin[vin])byVin[vin]=[];
+            byVin[vin].push(rec);
+          });
+          // newest first within each vehicle
+          Object.keys(byVin).forEach(function(v){
+            byVin[v].sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
+          });
+          resolve(byVin);
+        };
+        req.onerror=function(){resolve({});};
+      }catch(e){resolve({});}
+    });
+  });
+}
 var MAX_LOGIN_ATTEMPTS = 5;
 var LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 function checkLoginRate(email) {
@@ -2566,4 +2657,5 @@ export {
   saveSession,
   saveUsers,
   setCache,
-  setUserDeactivated, setUserBanned, deleteUserAccount, isBanned,};
+  setUserDeactivated, setUserBanned, deleteUserAccount, isBanned,
+  saveVideoToDB, deleteVideoFromDB, updateVideoInDB, loadAllVideosFromDB,};
