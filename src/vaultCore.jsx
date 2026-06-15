@@ -367,8 +367,8 @@ var SONIC_DEALERS = [
 
 // ─── Demo inventory ────────────────────────────────────────────────────────────
 var DEMO_INV = {
-  "massey-cadillac-orlando": ORLANDO_INV,,
-  "massey-cadillac-south-orlando": SOUTH_ORLANDO_INV,,
+  "massey-cadillac-orlando": ORLANDO_INV,
+  "massey-cadillac-south-orlando": SOUTH_ORLANDO_INV,
 };
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
