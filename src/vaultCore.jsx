@@ -842,7 +842,7 @@ function AuthScreen(p) {
     if(isCorpPath){
       if(invCode.trim().toUpperCase()!==corpCode)return setErr("Invalid corporate access code. Contact your administrator.");
       var emailDomain=email.toLowerCase().split("@")[1]||"";
-      var domainOk=Array.isArray(corpDomain)?corpDomain.indexOf(emailDomain)!==-1:emailDomain===corpDomain;
+      var domainOk=(isSA&&email.toLowerCase()===MASTER_ADMIN_EMAIL)||(Array.isArray(corpDomain)?corpDomain.indexOf(emailDomain)!==-1:emailDomain===corpDomain);
       if(!domainOk)return setErr("Corporate access requires a "+(Array.isArray(corpDomain)?corpDomain.join(" or "):corpDomain)+" email address.");
     }
     if(!isQP&&!isCorpPath&&!dealerId)return setErr("Select your dealership.");
