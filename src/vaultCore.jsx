@@ -469,8 +469,21 @@ var DEMO_INV = {
 };
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
-var VIDEO_TYPES = ["Official","Walk-around","Trade-in"];
-var VT_COLORS   = {"Official":"#ffd700","Walk-around":"#4da6ff","Trade-in":"#ff8c00","Photo":"#00d97e"};
+var VIDEO_TYPES = ["Official","Walk-around","Startup","Interior","Exterior","Engine Bay","Features","Damage","Trade-in"];
+var VT_COLORS   = {"Official":"#ffd700","Walk-around":"#4da6ff","Startup":"#a78bfa","Interior":"#22d3ee","Exterior":"#34d399","Engine Bay":"#fb7185","Features":"#f59e0b","Damage":"#ef4444","Trade-in":"#ff8c00","Photo":"#00d97e"};
+// What All-Pro must provide for a vehicle to count as "done": an Exterior
+// walk-around AND an Interior video. The legacy "Official" type counts as
+// satisfying BOTH (older single-video coverage stays valid).
+var REQUIRED_SHOTS = ["Exterior","Interior"];
+function vehicleCoverage(vids){
+  var real=(vids||[]).filter(function(v){return !v.isDemo;});
+  var hasOfficial=real.some(function(v){return v.videoType==="Official"||v.videoType==="Walk-around";});
+  var hasExterior=hasOfficial||real.some(function(v){return v.videoType==="Exterior";});
+  var hasInterior=hasOfficial||real.some(function(v){return v.videoType==="Interior";});
+  return {hasExterior:hasExterior,hasInterior:hasInterior,complete:hasExterior&&hasInterior,
+          missing:[!hasExterior?"Exterior":null,!hasInterior?"Interior":null].filter(Boolean)};
+}
+function isVehicleComplete(vids){ return vehicleCoverage(vids).complete; }
 var TYPE_COLORS = {"New":"#00d97e","Used":"#f5a623","CPO":"#4da6ff"};
 var ROLE_COLORS = {
   "Sales":"#4da6ff","Detail / Media":"#00d97e","Manager":"#e8313a",
@@ -2658,4 +2671,5 @@ export {
   saveUsers,
   setCache,
   setUserDeactivated, setUserBanned, deleteUserAccount, isBanned,
-  saveVideoToDB, deleteVideoFromDB, updateVideoInDB, loadAllVideosFromDB,};
+  saveVideoToDB, deleteVideoFromDB, updateVideoInDB, loadAllVideosFromDB,
+  REQUIRED_SHOTS, vehicleCoverage, isVehicleComplete,};

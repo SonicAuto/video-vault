@@ -76,8 +76,10 @@ import {
   rootStyle,
   saveSession,
   saveUsers,
-  setCache
-} from './vaultCore.jsx';
+  setCache,
+  REQUIRED_SHOTS,
+  vehicleCoverage,
+  isVehicleComplete} from './vaultCore.jsx';
 
 // ─── Shot List (All-Pro) ───────────────────────────────────────────────────────
 function ShotList(p) {
@@ -86,10 +88,12 @@ function ShotList(p) {
   var [assessed,setAssessed]=useState({});
 
   var needsVideo=inventory.filter(function(v){
-    return !(videos[v.vin]||[]).some(function(x){return x.videoType==="Official"&&!x.isDemo;});
+    return !isVehicleComplete(videos[v.vin]||[]);
   });
   var doneToday=inventory.filter(function(v){
-    return (videos[v.vin]||[]).some(function(x){return x.videoType==="Official"&&!x.isDemo&&x.uploader===user.name&&new Date(x.date).toDateString()===new Date().toDateString();});
+    var real=(videos[v.vin]||[]).filter(function(x){return !x.isDemo;});
+    var minePresent=real.some(function(x){return x.uploader===user.name&&new Date(x.date).toDateString()===new Date().toDateString();});
+    return minePresent&&isVehicleComplete(real);
   });
 
   var totalNeeds=needsVideo.length;
@@ -320,9 +324,9 @@ function CameraScreen(p) {
       </div>
       <video src={url} controls playsInline style={{flex:1,width:"100%",background:"#000",objectFit:"contain"}}/>
       <div style={{padding:"12px 16px 32px",background:th.panel,borderTop:"1px solid "+th.border}}>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
+        <div style={{display:"flex",gap:7,marginBottom:10,flexWrap:"wrap"}}>
           {VIDEO_TYPES.map(function(vt){
-            return <button key={vt} onClick={function(){setVT(vt);}} style={{flex:1,padding:"8px 0",background:videoType===vt?VT_COLORS[vt]+"18":"transparent",border:"1px solid "+(videoType===vt?VT_COLORS[vt]+"55":th.border),borderRadius:7,color:videoType===vt?VT_COLORS[vt]:th.muted,fontSize:11,cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700}}>{vt==="Official"?"★ ":""}{vt}</button>;
+            return <button key={vt} onClick={function(){setVT(vt);}} style={{padding:"7px 12px",background:videoType===vt?VT_COLORS[vt]+"18":"transparent",border:"1px solid "+(videoType===vt?VT_COLORS[vt]+"55":th.border),borderRadius:7,color:videoType===vt?VT_COLORS[vt]:th.muted,fontSize:11,cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700}}>{vt==="Official"?"★ ":""}{vt}</button>;
           })}
         </div>
         {duration<30&&<div style={{background:"#ffd70012",border:"1px solid #ffd70033",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:"#ffd700"}}>⚠ Recording is under 30 seconds — consider re-shooting for a full walkaround.</div>}
@@ -463,7 +467,7 @@ function InventoryScreen(p) {
 
   var filtered=base.filter(function(v){
     var vids=(videos[v.vin]||[]).filter(function(x){return !x.isDemo;});
-    var hasOff=vids.some(function(x){return x.videoType==="Official";});
+    var hasOff=isVehicleComplete(vids);
     var hasAny=vids.length>0;
     if(filter==="New")return v.type==="New";
     if(filter==="Used")return v.type==="Used";
@@ -671,7 +675,8 @@ function InventoryScreen(p) {
         </div>
       ):sorted.map(function(v){
         var vids=(videos[v.vin]||[]).filter(function(x){return !x.isDemo;});
-        var hasOff=vids.some(function(x){return x.videoType==="Official";});
+        var cov=vehicleCoverage(vids);
+        var hasOff=cov.complete;
         var sendCount=(sentLog[v.vin]||[]).length;
         var soldCount=(sentLog[v.vin]||[]).filter(function(s){return s.outcome==="Sold";}).length;
         var isLong=(v.daysOnLot||0)>=30;
@@ -696,7 +701,9 @@ function InventoryScreen(p) {
                 <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:3,background:tc+"18",border:"1px solid "+tc+"33",color:tc}}>{v.type}</span>
                 {v.miles>0&&<span style={{fontSize:9,color:th.muted}}>{fmtMiles(v.miles)}</span>}
                 <DaysBadge days={v.daysOnLot||0}/>
-                {hasOff&&<span style={{fontSize:9,fontWeight:700,color:"#ffd700",background:"#ffd70012",border:"1px solid #ffd70033",padding:"2px 6px",borderRadius:3}}>★ Off</span>}
+                {hasOff&&<span style={{fontSize:9,fontWeight:700,color:"#00d97e",background:"#00d97e12",border:"1px solid #00d97e33",padding:"2px 6px",borderRadius:3}}>✓ Complete</span>}
+                {!hasOff&&cov.hasExterior&&<span style={{fontSize:9,fontWeight:700,color:"#34d399",background:"#34d39912",border:"1px solid #34d39933",padding:"2px 6px",borderRadius:3}}>Ext ✓</span>}
+                {!hasOff&&cov.hasInterior&&<span style={{fontSize:9,fontWeight:700,color:"#22d3ee",background:"#22d3ee12",border:"1px solid #22d3ee33",padding:"2px 6px",borderRadius:3}}>Int ✓</span>}
                 {vids.length>0&&<span style={{fontSize:9,color:"#00d97e",background:"#00d97e12",border:"1px solid #00d97e33",padding:"2px 6px",borderRadius:3,fontWeight:700}}>▶ {vids.length}</span>}
                 {sendCount>0&&<span style={{fontSize:9,color:"#4da6ff",background:"#4da6ff12",border:"1px solid #4da6ff33",padding:"2px 6px",borderRadius:3,fontWeight:700}}>📤 {sendCount}</span>}
                 {soldCount>0&&<span style={{fontSize:9,color:"#c084fc",background:"#c084fc12",border:"1px solid #c084fc33",padding:"2px 6px",borderRadius:3,fontWeight:700}}>💰 {soldCount}</span>}
@@ -792,7 +799,7 @@ function VehicleDetail(p) {
   // Next vehicle for All-Pro
   useEffect(function(){
     if(!IS_AP)return;
-    var needsVid=p.inventory.filter(function(v){return !(p.videos[v.vin]||[]).some(function(x){return x.videoType==="Official"&&!x.isDemo;});});
+    var needsVid=p.inventory.filter(function(v){return !isVehicleComplete(p.videos[v.vin]||[]);});
     var idx=needsVid.findIndex(function(v){return v.vin===vehicle.vin;});
     if(idx!==-1&&idx<needsVid.length-1)setNextIdx(needsVid[idx+1].vin);
     else setNextIdx(null);
@@ -850,7 +857,8 @@ function VehicleDetail(p) {
   var realVids=vids.filter(function(v){return !v.isDemo;});
   var demoVids=vids.filter(function(v){return v.isDemo;});
   var officialVids=vids.filter(function(v){return v.videoType==="Official";});
-  var hasOff=realVids.some(function(v){return v.videoType==="Official";});
+  var detCov=vehicleCoverage(realVids);
+  var hasOff=detCov.complete;
 
   return <div style={rootStyle(th)}>
     <style>{getGS(th)}</style>
@@ -888,10 +896,27 @@ function VehicleDetail(p) {
         </div>
       </div>
 
+      {/* Coverage status — what All-Pro must provide to complete this vehicle */}
+      <div style={{padding:"10px 12px 0",background:th.panel}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:9,border:"1px solid "+(hasOff?"#00d97e44":"#ff6b3544"),background:(hasOff?"#00d97e":"#ff6b35")+"12"}}>
+          <span style={{fontSize:15}}>{hasOff?"✓":"📋"}</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,fontWeight:700,color:hasOff?"#00d97e":"#ff6b35"}}>{hasOff?"Complete — Exterior & Interior captured":"Required: Exterior walk-around + Interior"}</div>
+            {!hasOff&&<div style={{fontSize:10.5,color:th.muted,marginTop:2}}>
+              <span style={{color:detCov.hasExterior?"#34d399":th.faint}}>{detCov.hasExterior?"✓":"○"} Exterior</span>
+              <span style={{margin:"0 8px",color:th.faint}}>·</span>
+              <span style={{color:detCov.hasInterior?"#22d3ee":th.faint}}>{detCov.hasInterior?"✓":"○"} Interior</span>
+            </div>}
+          </div>
+        </div>
+      </div>
+
       {/* Action buttons */}
       <div style={{padding:"10px 12px 0",background:th.panel,display:"flex",gap:7}}>
         {IS_AP&&<>
-          <button onClick={function(){setCamType("Official");setShowCam(true);}} style={{flex:2,padding:10,borderRadius:9,border:"none",background:"#e8313a",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Barlow',sans-serif"}}>● Rec</button>
+          <button onClick={function(){setCamType("Exterior");setShowCam(true);}} style={{flex:1,padding:10,borderRadius:9,border:"none",background:detCov.hasExterior?"#34d39933":"#e8313a",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Barlow',sans-serif"}}>● Exterior</button>
+          <button onClick={function(){setCamType("Interior");setShowCam(true);}} style={{flex:1,padding:10,borderRadius:9,border:"none",background:detCov.hasInterior?"#22d3ee33":"#e8313a",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Barlow',sans-serif"}}>● Interior</button>
+          <button onClick={function(){setCamType("Startup");setShowCam(true);}} style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+th.border2,background:th.inp,color:th.text,cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif"}}>● More</button>
           <button onClick={function(){fileRef.current&&fileRef.current.click();}} style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+th.border2,background:th.inp,color:th.text,cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif"}}>↑ Upload</button>
         </>}
         {!IS_AP&&<>
