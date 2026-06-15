@@ -1030,24 +1030,6 @@ function AuthScreen(p) {
 // ─── Home Screen ───────────────────────────────────────────────────────────────
 function HomeScreen(p) {
   var th=p.th;
-  if(faceIdPrompt){
-    return <div style={{minHeight:"100vh",background:th.bg,display:"flex",flexDirection:"column",fontFamily:"'Barlow',sans-serif"}}>
-      <style>{getGS(th)}</style>
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,maxWidth:420,width:"100%",margin:"0 auto",textAlign:"center"}}>
-        <div style={{fontSize:64,marginBottom:16}}>🆔</div>
-        <div style={{fontSize:20,fontWeight:800,color:th.text,fontFamily:"'Barlow Condensed',sans-serif",marginBottom:8}}>Enable Face ID?</div>
-        <div style={{fontSize:13,color:th.muted,lineHeight:1.6,marginBottom:28}}>
-          Sign in faster next time on this device using Face ID or Touch ID — no password needed.
-        </div>
-        <button onClick={enableFaceId} disabled={faceIdBusy} style={{...pbtn(pc),opacity:faceIdBusy?0.6:1,marginBottom:10}}>
-          {faceIdBusy?"Setting up…":"Enable Face ID"}
-        </button>
-        <button onClick={skipFaceId} disabled={faceIdBusy} style={{width:"100%",padding:13,borderRadius:10,border:"none",background:"transparent",color:th.muted,cursor:"pointer",fontSize:14,fontFamily:"'Barlow',sans-serif"}}>
-          Not now
-        </button>
-      </div>
-    </div>;
-  }
 
   return <div style={{minHeight:"100vh",background:th.bg,display:"flex",flexDirection:"column",fontFamily:"'Barlow',sans-serif"}}>
     <style>{getGS(th)}</style>
