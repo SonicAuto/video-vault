@@ -1247,14 +1247,16 @@ function ShareComposer(p) {
     var file=new File([vid.blob],vid.name+ext,{type:vid.blob.type||(ext===".mov"?"video/quicktime":ext===".mp4"?"video/mp4":"application/octet-stream")});
     var doShare=function(){
       if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        navigator.share({title:vehicle?(vehicle.year+" "+vehicle.make+" "+vehicle.model):"Video",text:msg,files:[file]})
-          .then(function(){finish();})
-          .catch(function(err){if(err.name==="AbortError"){setSending(false);return;}finish();});
-      }else{finish();}
+        navigator.share({files:[file],text:msg})
+          .then(function(){finish(true);})
+          .catch(function(err){if(err&&err.name==="AbortError"){setSending(false);return;}finish(false);});
+      }else{finish(false);}
     };
-    function finish(){
+    function finish(shared){
       try{navigator.clipboard.writeText(msg);}catch(e){}
-      var a=document.createElement("a");a.href=URL.createObjectURL(vid.blob);a.download=vid.name+ext;a.click();
+      if(!shared){
+        var a=document.createElement("a");a.href=URL.createObjectURL(vid.blob);a.download=vid.name+ext;a.click();
+      }
       setSending(false);
       p.onSend({custName:custName||"Customer",custContact:custContact,msg:msg,sentAt:new Date().toISOString(),followUpDays:followUp?followUpDays:null});
     }
