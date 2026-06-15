@@ -769,6 +769,12 @@ function AuthScreen(p) {
   var [step,setStep]=useState("form");
   var [faceIdPrompt,setFaceIdPrompt]=useState(null); // user object pending Face ID enable
   var [faceIdBusy,setFaceIdBusy]=useState(false);
+  var [resetMode,setResetMode]=useState(false);
+  var [resetSent,setResetSent]=useState(false);
+  var [resetCode,setResetCode]=useState("");
+  var [resetCodeInput,setResetCodeInput]=useState("");
+  var [newPw1,setNewPw1]=useState(""); var [newPw2,setNewPw2]=useState("");
+  var [resetBusy,setResetBusy]=useState(false);
   var faceIdEmail=getFaceIdEmail();
   var faceIdEnabledHere=faceIdAvailable()&&!!faceIdEmail;
   var d0=useRef(),d1=useRef(),d2=useRef(),d3=useRef(),d4=useRef(),d5=useRef();
@@ -806,6 +812,46 @@ function AuthScreen(p) {
     }else{
       p.onLogin(u);
     }
+  }
+  async function doSendReset(){
+    clr();
+    if(!email||!email.includes("@"))return setErr("Enter the email address for your account.");
+    var users=getUsers();
+    var u=users[email.toLowerCase()];
+    if(!u)return setErr("No account found with that email.");
+    var code=randCode();
+    setResetCode(code);
+    if(isDemoMode()){
+      setResetSent(true);
+      setInfo("Demo Mode: your reset code is "+code+".");
+      return;
+    }
+    setResetBusy(true);
+    setInfo("📧 Sending reset code to "+email+"…");
+    var sendRes=await sendVerificationEmail(email, code, u.name);
+    setResetBusy(false);
+    if(sendRes.ok){
+      setResetSent(true);
+      setInfo("📧 Code sent to "+email+". Enter it below with your new password.");
+    }else{
+      setResetSent(true);
+      setInfo("Couldn't send the email, but here's your code: "+code+".");
+    }
+  }
+  function doResetPassword(){
+    clr();
+    if(resetCodeInput.trim()!==resetCode)return setErr("Incorrect reset code.");
+    if(newPw1.length<6)return setErr("Password must be at least 6 characters.");
+    if(newPw1!==newPw2)return setErr("Passwords do not match.");
+    var users=getUsers();
+    var u=users[email.toLowerCase()];
+    if(!u)return setErr("No account found with that email.");
+    u.password=newPw1;
+    users[email.toLowerCase()]=u;
+    saveUsers(users);
+    clearLoginAttempts(email.toLowerCase());
+    setResetMode(false); setResetSent(false); setResetCode(""); setResetCodeInput(""); setNewPw1(""); setNewPw2(""); setPw("");
+    setInfo("Password updated! Sign in with your new password below.");
   }
   async function enableFaceId(){
     if(!faceIdPrompt)return;
@@ -948,7 +994,26 @@ function AuthScreen(p) {
           })}
         </div>
         {err&&<ErrBox msg={err}/>}
+        {info&&<InfoBox msg={info}/>}
         {tab==="login"&&<div>
+          {resetMode?<div>
+            <div style={{fontSize:13,color:th.muted,lineHeight:1.6,marginBottom:16}}>
+              Enter your account email{resetSent?", the reset code, and a new password":""} below.
+            </div>
+            <span style={lbl(th)}>Work Email</span>
+            <input style={inp(th)} type="email" inputMode="email" autoCapitalize="none" placeholder="you@dealership.com" value={email} onChange={function(e){setEmail(e.target.value);}}/>
+            {!resetSent&&<button onClick={doSendReset} disabled={resetBusy} style={{...pbtn(pc),marginTop:20,opacity:resetBusy?0.6:1}}>{resetBusy?"Sending…":"Send Reset Code"}</button>}
+            {resetSent&&<div>
+              <span style={lbl(th)}>6-Digit Code</span>
+              <input style={inp(th)} inputMode="numeric" maxLength={6} placeholder="000000" value={resetCodeInput} onChange={function(e){setResetCodeInput(e.target.value.replace(/[^0-9]/g,""));}}/>
+              <span style={lbl(th)}>New Password</span>
+              <PwInput value={newPw1} onChange={setNewPw1} placeholder="Min. 6 characters" th={th}/>
+              <span style={lbl(th)}>Confirm New Password</span>
+              <PwInput value={newPw2} onChange={setNewPw2} onEnter={doResetPassword} placeholder="Re-enter new password" th={th}/>
+              <button onClick={doResetPassword} style={{...pbtn(pc),marginTop:20}}>Reset Password →</button>
+            </div>}
+            <button onClick={function(){setResetMode(false);setResetSent(false);setResetCode("");setResetCodeInput("");setNewPw1("");setNewPw2("");clr();}} style={{width:"100%",padding:13,borderRadius:10,border:"none",background:"transparent",color:th.muted,cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",marginTop:14}}>← Back to Sign In</button>
+          </div>:<>
           {faceIdEnabledHere&&<button onClick={faceIdLogin} disabled={faceIdBusy} style={{width:"100%",padding:"14px 0",borderRadius:12,border:"1px solid "+pc+"55",background:pc+"12",color:pc,cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:"'Barlow',sans-serif",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:faceIdBusy?0.6:1}}>
             <span style={{fontSize:18}}>🆔</span> {faceIdBusy?"Verifying…":"Sign in with Face ID"}
           </button>}
@@ -958,6 +1023,8 @@ function AuthScreen(p) {
           <span style={lbl(th)}>Password</span>
           <PwInput value={pw} onChange={setPw} onEnter={doLogin} placeholder="••••••••" th={th}/>
           <button onClick={doLogin} style={{...pbtn(pc),marginTop:20}}>Sign In →</button>
+          <button onClick={function(){setResetMode(true);clr();}} style={{width:"100%",padding:"10px 0",border:"none",background:"transparent",color:th.faint,cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",textDecoration:"underline",marginTop:10}}>Forgot password?</button>
+          </>}
         </div>}
         {tab==="signup"&&<div>
           <span style={lbl(th)}>Full Name</span>

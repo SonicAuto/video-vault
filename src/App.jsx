@@ -1655,12 +1655,13 @@ export default function App() {
     // Log session
     if(!_db.currentSessionId)_db.currentSessionId=randId();
     addAudit({type:"login",user:u.email,store:u.dealerId||u.activeStore});
+    setScreen("app");
     if(!u.termsVersion||u.termsVersion!==TERMS_VERSION){
       setUser(u); setShowTerms(true);
     } else if(!u.hasOnboarded){
       setUser(u); setShowOnboard(true);
     } else {
-      setUser(u); setScreen("app"); setCurrentView("inventory");
+      setUser(u); setCurrentView("inventory");
     }
   }
 
