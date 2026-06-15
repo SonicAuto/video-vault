@@ -1630,6 +1630,12 @@ export default function App() {
           setArchived(newArchived);
           return prev;
         });
+        if(mapped.length===0){
+          var fb=DEMO_INV[storeId]||DEMO_INV["massey-cadillac-orlando"]||[];
+          setInventory(fb); setCache(storeId,fb); setLastSync(new Date());
+          setInvLoading(false);
+          return;
+        }
         setInventory(mapped); setCache(storeId,mapped); setLastSync(new Date());
         setInvLoading(false);
         clearInterval(refreshRef.current);
@@ -1638,7 +1644,8 @@ export default function App() {
       .catch(function(e){
         setInvError(e.message||"Inventory unavailable");
         var cached=getCache(storeId);
-        if(cached.length>0)setInventory(cached);
+        if(cached.length>0){setInventory(cached);}
+        else{ setInventory(DEMO_INV[storeId]||DEMO_INV["massey-cadillac-orlando"]||[]); }
         setInvLoading(false);
       });
   }
