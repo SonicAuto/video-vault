@@ -8,7 +8,7 @@ import {
   ConfirmModal,
   DARK,
   DEMO_INV,
-  DEMO_MODE,
+  isDemoMode,
   DaysBadge,
   ErrBox,
   HomeScreen,
@@ -596,7 +596,7 @@ function InventoryScreen(p) {
       </div>
 
       {/* Demo banner */}
-      {DEMO_MODE&&<div style={{background:"#ffd70012",border:"1px solid #ffd70030",borderRadius:8,padding:"6px 10px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+      {isDemoMode()&&<div style={{background:"#ffd70012",border:"1px solid #ffd70030",borderRadius:8,padding:"6px 10px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
         <span style={{fontSize:10,color:"#ffd700",fontWeight:700}}>🎬 Demo Mode</span>
         <span style={{fontSize:10,color:th.faint}}>Sample {user.dealerName} inventory</span>
       </div>}
@@ -1123,7 +1123,7 @@ function ProfileScreen(p) {
       {/* App info */}
       <div style={{...card(th),padding:14,marginBottom:16}}>
         <div style={{fontSize:10,color:th.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>App Info</div>
-        {[["Version",APP_VERSION],["Terms Version",TERMS_VERSION],["Mode",DEMO_MODE?"Demo":"Live"]].map(function(item){
+        {[["Version",APP_VERSION],["Terms Version",TERMS_VERSION],["Mode",isDemoMode()?"Demo":"Live"]].map(function(item){
           return <div key={item[0]} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid "+th.border}}>
             <span style={{fontSize:12,color:th.muted}}>{item[0]}</span>
             <span style={{fontSize:12,color:th.text,fontWeight:600}}>{item[1]}</span>
