@@ -80,8 +80,10 @@ import {
   rootStyle,
   saveSession,
   saveUsers,
-  setCache
-} from './vaultCore.jsx';
+  setCache,
+  setUserDeactivated,
+  setUserBanned,
+  deleteUserAccount} from './vaultCore.jsx';
 import {
   CameraScreen,
   InventoryScreen,
@@ -98,6 +100,7 @@ import {
 // ─── Admin Panel (for app owner - you) ────────────────────────────────────────
 function AdminPanel(p) {
   var th=p.th;
+  function adminActBtn(color,solid){ return {padding:"5px 11px",background:solid?color:color+"12",border:"1px solid "+color+(solid?"":"33"),color:solid?"#fff":color,borderRadius:6,cursor:"pointer",fontSize:10,fontFamily:"'Barlow',sans-serif",fontWeight:700,flexShrink:0}; }
   var users=getUsers();
   var allUsers=Object.values(users);
   var stores={};
@@ -121,12 +124,31 @@ function AdminPanel(p) {
     _db.deactivatedStores[sid]=true;
     p.onToast("Store deactivated.");
   }
+  var [refresh,setRefresh]=useState(0);
   function deactivateUser(email){
-    if(!window.confirm("Deactivate "+email+"? They will not be able to log in."))return;
-    var u=getUsers();
-    if(u[email])u[email]=Object.assign({},u[email],{deactivated:true});
-    saveUsers(u);
+    if(!window.confirm("Deactivate "+email+"? They will not be able to log in until reactivated."))return;
+    setUserDeactivated(email,true); setRefresh(function(n){return n+1;});
     p.onToast("User deactivated.");
+  }
+  function reactivateUser(email){
+    setUserDeactivated(email,false); setRefresh(function(n){return n+1;});
+    p.onToast("User reactivated.");
+  }
+  function banUser(email){
+    var reason=window.prompt("Ban "+email+"?\n\nOptionally enter a reason (shown to the user). This blocks all login attempts.");
+    if(reason===null)return;
+    setUserBanned(email,true,reason); setRefresh(function(n){return n+1;});
+    p.onToast("User banned.");
+  }
+  function unbanUser(email){
+    setUserBanned(email,false); setRefresh(function(n){return n+1;});
+    p.onToast("Ban lifted.");
+  }
+  function deleteUser(email){
+    if(!window.confirm("PERMANENTLY DELETE "+email+"?\n\nThis removes the account entirely and cannot be undone. Their uploaded videos remain attached to vehicles."))return;
+    if(!window.confirm("Are you absolutely sure? This is permanent."))return;
+    deleteUserAccount(email); setRefresh(function(n){return n+1;});
+    p.onToast("Account deleted.");
   }
 
   var totalVideos=Object.values(p.videosByStore||{}).reduce(function(a,b){return a+b;},0);
@@ -197,20 +219,30 @@ function AdminPanel(p) {
         {filteredUsers.map(function(u){
           var rc=ROLE_COLORS[u.role]||"#888";
           var isDeact=u.deactivated;
-          return <div key={u.email} style={{...card(th),borderRadius:9,padding:"10px 12px",marginBottom:7,opacity:isDeact?0.5:1}}>
+          var isBan=u.banned;
+          var canManage=u.email!==p.currentEmail&&u.email!==MASTER_ADMIN_EMAIL;
+          return <div key={u.email} style={{...card(th),borderRadius:9,padding:"10px 12px",marginBottom:7,opacity:(isDeact||isBan)?0.6:1}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{width:32,height:32,borderRadius:"50%",background:rc+"28",border:"1px solid "+rc+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:rc,flexShrink:0}}>{u.name[0].toUpperCase()}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:700,color:th.text}}>{u.name}</div>
                 <div style={{fontSize:10,color:th.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.email}</div>
-                <div style={{display:"flex",gap:6,marginTop:2}}>
+                <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
                   <span style={{fontSize:9,color:rc,background:rc+"18",border:"1px solid "+rc+"33",padding:"1px 6px",borderRadius:3,fontWeight:700}}>{u.role}</span>
                   <span style={{fontSize:9,color:th.faint}}>{u.dealerName}</span>
+                  {isBan&&<span style={{fontSize:9,color:"#e8313a",background:"#e8313a18",border:"1px solid #e8313a44",padding:"1px 6px",borderRadius:3,fontWeight:700}}>BANNED</span>}
+                  {isDeact&&!isBan&&<span style={{fontSize:9,color:"#ffa500",background:"#ffa50018",border:"1px solid #ffa50044",padding:"1px 6px",borderRadius:3,fontWeight:700}}>INACTIVE</span>}
                 </div>
               </div>
-              {!isDeact&&<button onClick={function(){deactivateUser(u.email);}} style={{padding:"4px 10px",background:"#e8313a12",border:"1px solid #e8313a33",color:"#e8313a",borderRadius:6,cursor:"pointer",fontSize:10,fontFamily:"'Barlow',sans-serif",flexShrink:0}}>Deactivate</button>}
-              {isDeact&&<span style={{fontSize:9,color:"#e8313a",fontWeight:700}}>Inactive</span>}
             </div>
+            {canManage&&<div style={{display:"flex",gap:6,marginTop:9,flexWrap:"wrap"}}>
+              {!isDeact&&!isBan&&<button onClick={function(){deactivateUser(u.email);}} style={adminActBtn("#ffa500")}>Deactivate</button>}
+              {isDeact&&!isBan&&<button onClick={function(){reactivateUser(u.email);}} style={adminActBtn("#00d97e")}>Reactivate</button>}
+              {!isBan&&<button onClick={function(){banUser(u.email);}} style={adminActBtn("#e8313a")}>Ban</button>}
+              {isBan&&<button onClick={function(){unbanUser(u.email);}} style={adminActBtn("#00d97e")}>Lift Ban</button>}
+              <button onClick={function(){deleteUser(u.email);}} style={adminActBtn("#e8313a",true)}>Delete</button>
+            </div>}
+            {!canManage&&<div style={{fontSize:9,color:th.faint,marginTop:7,fontStyle:"italic"}}>{u.email===MASTER_ADMIN_EMAIL?"Platform owner — protected":"This is you"}</div>}
           </div>;
         })}
       </div>}
@@ -1922,7 +1954,7 @@ export default function App() {
       <style>{getGS(th)}</style>
       {sessionTimeoutEl}
       {toast&&<Toast msg={toast.msg} type={toast.type} onDone={function(){setToast(null);}}/>}
-      {showAdmin&&<AdminPanel th={th} onClose={function(){setShowAdmin(false);}} onToast={showToast}/>}
+      {showAdmin&&<AdminPanel th={th} currentEmail={user.email} onClose={function(){setShowAdmin(false);}} onToast={showToast}/>}
       {showWhiteLabel&&<WhiteLabelSettings th={th} onClose={function(){setShowWhiteLabel(false);}} onSave={function(s){_db.whiteLabelSettings=s;showToast("Branding saved!");}} onToast={showToast}/>}
       {showSoldArchive&&<SoldArchive th={th} videos={videos} sentLog={sentLog} inventory={inventory} archivedVins={archivedVins} onClose={function(){setShowSoldArchive(false);}}/>}
       <ManagerDash th={th} user={user} videos={videos} sentLog={sentLog} inventory={inventory}

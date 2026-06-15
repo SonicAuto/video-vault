@@ -221,6 +221,10 @@ function isAllowedEmail(email){
 
 function getUsers()         { return _db.users; }
 function saveUsers(u)       { _db.users = u; persistDB(); }
+function setUserDeactivated(email, val){ var u=_db.users; if(u[email]){ u[email]=Object.assign({},u[email],{deactivated:!!val}); _db.users=u; persistDB(); } }
+function setUserBanned(email, val, reason){ var u=_db.users; if(u[email]){ u[email]=Object.assign({},u[email],{banned:!!val,banReason:val?(reason||""):null,bannedAt:val?new Date().toISOString():null}); _db.users=u; persistDB(); } }
+function deleteUserAccount(email){ var u=_db.users; if(u[email]){ delete u[email]; _db.users=u; if(_db.session&&_db.session.email===email){_db.session=null;} persistDB(); return true; } return false; }
+function isBanned(email){ var u=_db.users[email]; return !!(u&&u.banned); }
 function getSession()       { return _db.session; }
 function saveSession(u)     { _db.session = u; persistDB(); }
 function clearSession()     { _db.session = null; persistDB(); }
@@ -800,6 +804,8 @@ function AuthScreen(p) {
     var u=getUsers()[email.toLowerCase()];
     if(!u){recordLoginFail(email.toLowerCase());return setErr("No account found with that email.");}
     if(!u.verified){recordLoginFail(email.toLowerCase());return setErr("Account not verified. Check your email for the code.");}
+    if(u.banned)return setErr("This account has been banned"+(u.banReason?": "+u.banReason:".")+" Contact your administrator.");
+    if(u.deactivated)return setErr("This account has been deactivated. Contact your administrator.");
     if(u.password!==pw){recordLoginFail(email.toLowerCase());return setErr("Incorrect password. "+(checkLoginRate(email.toLowerCase()).remaining)+" attempt"+(checkLoginRate(email.toLowerCase()).remaining!==1?"s":"")+" remaining.");}
     clearLoginAttempts(email.toLowerCase());
     if(isQP&&u.role!==QC_ROLE)return setErr("This is not a QC account.");
@@ -852,6 +858,23 @@ function AuthScreen(p) {
     clearLoginAttempts(email.toLowerCase());
     setResetMode(false); setResetSent(false); setResetCode(""); setResetCodeInput(""); setNewPw1(""); setNewPw2(""); setPw("");
     setInfo("Password updated! Sign in with your new password below.");
+  }
+  function doDemo(){
+    clr();
+    var demoRole=isAP?ALLPRO_ROLE:isQP?QC_ROLE:isSC?SONIC_CORP_ROLE:isAC?ALLPRO_CORP_ROLE:isSA?SONIC_ADMIN_ROLE:"Sales";
+    var demoStore=isQP?"allpro-qc":isSC?"sonic-corporate":isAC?"allpro-corporate":"massey-cadillac-orlando";
+    var demoStoreName=isQP?"All-Pro QC":isSC?"Sonic Automotive Corporate":isAC?"All-Pro Corporate":isSA?"Sonic Automotive \u2014 Platform Admin":"Massey Cadillac of Orlando";
+    var demoUser={
+      email:"demo-"+(demoRole.toLowerCase().replace(/[^a-z]/g,""))+"@demo.videovault",
+      password:"", name:(pl||"Demo")+" (Demo)", role:demoRole,
+      dealerId:demoStore, dealerName:demoStoreName, dealerCity:isQP||isCorpPath?"Network-Wide":"Orlando, FL",
+      verified:true, isDemo:true,
+      termsVersion:TERMS_VERSION, hasOnboarded:true,
+      profilePhoto:null, displayName:null,
+      stores:[demoStore], activeStore:demoStore,
+    };
+    addAudit({type:"demo_login",user:demoUser.email,store:demoUser.dealerId,role:demoRole});
+    p.onLogin(demoUser);
   }
   async function enableFaceId(){
     if(!faceIdPrompt)return;
@@ -1062,6 +1085,10 @@ function AuthScreen(p) {
             <DealerPicker dealerId={dealerId} setDealerId={setDealer} th={th}/>
           </div>}
           <button onClick={doSignup} style={{...pbtn(pc),marginTop:20}}>Send Confirmation Code →</button>
+        </div>}
+        {!resetMode&&<div style={{textAlign:"center",marginTop:22,paddingTop:16,borderTop:"1px solid "+th.border}}>
+          <button onClick={doDemo} style={{background:"none",border:"none",color:th.faint,fontSize:11.5,cursor:"pointer",fontFamily:"'Barlow',sans-serif",textDecoration:"underline"}}>Explore in demo mode</button>
+          <div style={{fontSize:9.5,color:th.faint,opacity:0.6,marginTop:5,lineHeight:1.4}}>Browse a sample {pl} account. No data is saved.</div>
         </div>}
       </div>}
       {step==="verify"&&<div>
@@ -2534,5 +2561,5 @@ export {
   rootStyle,
   saveSession,
   saveUsers,
-  setCache
-};
+  setCache,
+  setUserDeactivated, setUserBanned, deleteUserAccount, isBanned,};
