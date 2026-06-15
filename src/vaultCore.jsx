@@ -17,7 +17,7 @@ var AUTO_REFRESH    = 30 * 60 * 1000;
 // build-time constant — Master Admin can flip it from the inventory screen.
 // When ON: inventory uses DEMO_INV/ORLANDO_INV/SOUTH_ORLANDO_INV data and
 // new signups are auto-verified (no email step) for frictionless demos.
-function isDemoMode(){ return _db.demoMode!==false; }
+function isDemoMode(){ return _db.demoMode===true; }
 function setDemoMode(v){ _db.demoMode=!!v; persistDB(); }
 var QC_INVITE_CODE  = "ALLPRO-QC-2025";
 // Required at signup for anyone selecting the "Manager" role — gives Bryan
@@ -49,6 +49,7 @@ var _db = {
   loginAttempts:{}, // {email: {count, lockedUntil}}
   faceIdCreds:{}, faceIdEmail:null, // WebAuthn Face ID / Touch ID
   brandAckDone:false, recordingConsentAckDone:false,
+  demoMode:false,
 };
 
 // ─── Persistent storage (logins, accounts, settings survive reloads) ───────────
@@ -56,10 +57,11 @@ var _db = {
 // reminders, audit history, etc. survive a page refresh / app restart on this
 // device. Cached inventory (_db.cache) is intentionally excluded — it's
 // re-fetched from MarketCheck/demo data on load and can get large.
-var DB_STORAGE_KEY = "videovault_db_v1";
+var DB_STORAGE_KEY = "videovault_db_v2";
 function loadDB(){
   try{
     if(typeof localStorage==="undefined")return;
+    try{ localStorage.removeItem("videovault_db_v1"); }catch(e){}
     var raw=localStorage.getItem(DB_STORAGE_KEY);
     if(!raw)return;
     var saved=JSON.parse(raw);
