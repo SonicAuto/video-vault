@@ -183,6 +183,7 @@ function CameraScreen(p) {
   var videoRef=useRef(null); var mediaRef=useRef(null); var streamRef=useRef(null);
   var chunksRef=useRef([]); var timerRef=useRef(null); var batteryRef=useRef(null);
   var [recording,setRecording]=useState(false);
+  var [showSteadyTip,setShowSteadyTip]=useState(false);
   var [paused,setPaused]=useState(false);
   var [elapsed,setElapsed]=useState(0);
   var [countdown,setCountdown]=useState(0);
@@ -214,10 +215,46 @@ function CameraScreen(p) {
 
   function startCamera(){
     cleanup();
-    navigator.mediaDevices.getUserMedia({
-      video:{facingMode:facing,width:{ideal:1920},height:{ideal:1080}},
-      audio:true
-    }).then(function(stream){
+    // Request the device's built-in (hardware/OS-level) stabilization plus a
+    // steady, standard 30fps capture — phones apply the most stabilization at
+    // standard video settings. "advanced" constraints are best-effort: if the
+    // device doesn't support a given one it's simply ignored, never an error.
+    var videoConstraints={
+      facingMode:facing,
+      width:{ideal:1920}, height:{ideal:1080},
+      frameRate:{ideal:30, max:30},
+      advanced:[
+        {videoKind:"motionvideo"},
+        {noiseSuppression:true},
+        {whiteBalanceMode:"continuous"},
+        {focusMode:"continuous"},
+        {exposureMode:"continuous"}
+      ]
+    };
+    function openWith(vc){
+      return navigator.mediaDevices.getUserMedia({video:vc,audio:true});
+    }
+    openWith(videoConstraints)
+      .catch(function(){
+        // Fallback for devices that reject the advanced constraints.
+        return openWith({facingMode:facing,width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:30}});
+      })
+      .catch(function(){
+        // Last-resort minimal constraints so the camera always opens.
+        return openWith({facingMode:facing});
+      })
+      .then(function(stream){
+      // Apply stabilization as a track setting too (some devices only honor it post-open).
+      try{
+        var vt=stream.getVideoTracks()[0];
+        if(vt&&vt.applyConstraints){
+          var caps=vt.getCapabilities?vt.getCapabilities():{};
+          var extra={};
+          // Newer spec: some browsers expose a stabilization-capable setting.
+          if(caps&&caps.frameRate)extra.frameRate=30;
+          if(Object.keys(extra).length)vt.applyConstraints({advanced:[extra]}).catch(function(){});
+        }
+      }catch(e){}
       streamRef.current=stream;
       if(videoRef.current){videoRef.current.srcObject=stream;videoRef.current.play();}
       // Audio analyser
@@ -268,6 +305,7 @@ function CameraScreen(p) {
     // Mute audio tracks if muted
     streamRef.current.getAudioTracks().forEach(function(t){t.enabled=!muted;});
     mr.start(1000); setRecording(true); setPaused(false);
+    setShowSteadyTip(true); setTimeout(function(){setShowSteadyTip(false);},4000);
     var s=0; timerRef.current=setInterval(function(){
       s++; setElapsed(s);
       if(s>=MAX_REC_SECONDS){doStop();}
@@ -350,6 +388,11 @@ function CameraScreen(p) {
     </div>}
 
     <video ref={videoRef} autoPlay muted playsInline style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}/>
+
+    {/* Hold-steady coaching tip — appears briefly when recording starts */}
+    {showSteadyTip&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"rgba(0,0,0,0.72)",color:"#fff",padding:"12px 18px",borderRadius:12,fontSize:13,fontWeight:600,fontFamily:"'Barlow',sans-serif",textAlign:"center",zIndex:4,pointerEvents:"none",lineHeight:1.5,maxWidth:240}}>
+      🤚 Hold steady — brace your elbows<br/>and move slowly for a smooth shot
+    </div>}
 
     {/* Grid overlay */}
     {grid&&<div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
