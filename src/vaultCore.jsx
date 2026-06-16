@@ -53,7 +53,7 @@ var QC_INVITE_CODE  = "ALLPRO-QC-2025";
 // Required at signup for anyone selecting the "Manager" role — gives Bryan
 // control over who gets Manager Dashboard access (staff activity, store
 // settings, manager passkey, etc.) at each dealership.
-var MANAGER_INVITE_CODE = "SONIC-MGR-2025";
+var MANAGER_INVITE_CODE = "MASSEY-MGR-2025";
 var SONIC_CORP_ROLE   = "Sonic Corporate";
 var ALLPRO_CORP_ROLE  = "All-Pro Corporate";
 var SONIC_CORP_CODE   = "SONIC-CORP-2025";
@@ -2260,7 +2260,7 @@ function ManagerDash(p) {
             return <div key={ri} style={{...card(th),padding:"11px 14px",marginBottom:8}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:13,fontWeight:700,color:th.text}}>{vv?vv.year+" "+vv.make+" "+vv.model:row.vin.slice(-8)}</span>
-                <TypeBadge type={row._vid.videoType} small/>
+                <VTypeBadge type={row._vid.videoType} small={true}/>
               </div>
               <div style={{fontSize:10,color:th.muted,marginTop:3}}>{row._vid.uploader||"—"} · {row._vid.date?new Date(row._vid.date).toLocaleDateString():""}</div>
             </div>;
