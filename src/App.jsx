@@ -87,7 +87,9 @@ import {
   saveVideoToDB,
   deleteVideoFromDB,
   updateVideoInDB,
-  loadAllVideosFromDB} from './vaultCore.jsx';
+  loadAllVideosFromDB,
+  availableDealers,
+  PILOT_STORE_IDS} from './vaultCore.jsx';
 import {
   CameraScreen,
   InventoryScreen,
@@ -1201,7 +1203,7 @@ function LowDataBanner(p) {
 function QCReviewerAssignment(p) {
   var th=p.th;
   var users=Object.values(getUsers()).filter(function(u){return u.role===QC_ROLE;});
-  var stores=SONIC_DEALERS.slice(0,20);
+  var stores=availableDealers();
   var [assignments,setAssignments]=useState(_db.qcAssignments||{});
 
   function assign(storeId,email){
@@ -1444,6 +1446,8 @@ function PinchZoomImage(p) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
+var BOTH_STORES="__both__";
+
 export default function App() {
   var [theme,setTheme]=useState("dark");
   var th=theme==="dark"?DARK:LIGHT;
@@ -1619,7 +1623,44 @@ export default function App() {
   }
 
   // ── Inventory loading ────────────────────────────────────────────────────────
+  function loadBothInventories(){
+    setInvLoading(true); setInvError(null);
+    var ids=PILOT_STORE_IDS;
+    if(isDemoMode()){
+      setTimeout(function(){
+        var merged=[];
+        ids.forEach(function(sid){
+          (DEMO_INV[sid]||[]).forEach(function(v){merged.push(Object.assign({},v,{_store:sid}));});
+        });
+        setInventory(merged); setLastSync(new Date()); setInvLoading(false);
+      },600);
+      return;
+    }
+    Promise.all(ids.map(function(sid){
+      var dealer=SONIC_DEALERS.find(function(d){return d.id===sid;});
+      var q=dealer?dealer.name:"Massey Cadillac";
+      return fetch(WORKER_URL+"?q="+encodeURIComponent(q)+"&rows=50")
+        .then(function(r){return r.json();})
+        .then(function(data){
+          var items=(data.response&&data.response.docs)||data.listing||[];
+          var mapped=items.map(function(v){
+            return {vin:v.vin,stock:v.stock_no||v.vin.slice(-6),year:v.year||2025,make:v.make||"",
+              model:v.model||"",trim:v.trim||"",color:v.exterior_color||"",miles:v.miles||0,price:v.price||0,
+              type:v.car_type==="new"?"New":v.car_type==="certified"?"CPO":"Used",
+              daysOnLot:v.dom||0,thumb:v.photo_links&&v.photo_links[0]||null,_store:sid};
+          });
+          if(mapped.length===0)mapped=(DEMO_INV[sid]||[]).map(function(v){return Object.assign({},v,{_store:sid});});
+          return mapped;
+        })
+        .catch(function(){return (DEMO_INV[sid]||[]).map(function(v){return Object.assign({},v,{_store:sid});});});
+    })).then(function(lists){
+      var merged=[]; lists.forEach(function(l){merged=merged.concat(l);});
+      setInventory(merged); setLastSync(new Date()); setInvLoading(false);
+    });
+  }
+
   function loadInventory(storeId){
+    if(storeId===BOTH_STORES){return loadBothInventories();}
     setInvLoading(true); setInvError(null);
     if(isDemoMode()){
       setTimeout(function(){
@@ -1680,8 +1721,17 @@ export default function App() {
       var storeId=user.activeStore||user.dealerId||"massey-cadillac-orlando";
       loadInventory(storeId);
       if(isDemoMode()){
-        setVideos(buildDemoVideos(storeId));
-        setSentLog(buildDemoSentLog(storeId));
+        if(storeId===BOTH_STORES){
+          var dv1=buildDemoVideos("massey-cadillac-orlando");
+          var dv2=buildDemoVideos("massey-cadillac-south-orlando");
+          var ds1=buildDemoSentLog("massey-cadillac-orlando");
+          var ds2=buildDemoSentLog("massey-cadillac-south-orlando");
+          setVideos(Object.assign({},dv1,dv2));
+          setSentLog(Object.assign({},ds1,ds2));
+        } else {
+          setVideos(buildDemoVideos(storeId));
+          setSentLog(buildDemoSentLog(storeId));
+        }
       }
     } else if(user&&isCorporate(user)&&isDemoMode()){
       // Corporate sees demo data aggregated across the demo stores for preview purposes
@@ -1716,6 +1766,10 @@ export default function App() {
   function showToast(msg,type){setToast({msg:msg,type:type||"success"});}
 
   function handleLogin(u){
+    // Managers and the GM see both stores by default; sales default to their own store.
+    if(isManager(u)&&(u.stores||[]).length>1&&!u.activeStore){
+      u=Object.assign({},u,{activeStore:BOTH_STORES,dealerName:"Both Stores"});
+    }
     // Log session
     if(!_db.currentSessionId)_db.currentSessionId=randId();
     addAudit({type:"login",user:u.email,store:u.dealerId||u.activeStore});
@@ -1762,6 +1816,13 @@ export default function App() {
 
   function handleUpdateUser(u){setUser(u);saveSession(u);}
 
+  // When viewing both stores, resolve which store a vehicle actually belongs to.
+  function vehicleStore(vin){
+    var v=(inventory||[]).find(function(x){return x.vin===vin;});
+    if(v&&v._store)return v._store;
+    return user.activeStore===BOTH_STORES?(user.dealerId||"massey-cadillac-orlando"):(user.activeStore||user.dealerId);
+  }
+
   function handleSaveVideo(vin,vid){
     // Check video expiration settings
     setVideos(function(prev){
@@ -1773,7 +1834,7 @@ export default function App() {
       return n;
     });
     if(!vid.isDemo){ saveVideoToDB(vin,vid); }
-    addAudit({type:"video_upload",user:user.email,vin:vin,store:user.dealerId||user.activeStore,videoType:vid.videoType,vidName:vid.name,uploader:vid.uploader,role:vid.role,duration:vid.duration||0});
+    addAudit({type:"video_upload",user:user.email,vin:vin,store:vehicleStore(vin),videoType:vid.videoType,vidName:vid.name,uploader:vid.uploader,role:vid.role,duration:vid.duration||0});
 
     // Notify sales staff who recently viewed this vehicle (if All-Pro uploaded)
     if(vid.role===ALLPRO_ROLE&&vid.videoType==="Official"){
@@ -1845,7 +1906,7 @@ export default function App() {
       })]);
       return n;
     });
-    addAudit({type:"video_sent",user:user.email,vin:vin,customer:sendData.custName,store:user.dealerId||user.activeStore});
+    addAudit({type:"video_sent",user:user.email,vin:vin,customer:sendData.custName,store:vehicleStore(vin)});
     // Auto follow-up reminder if salesperson selected it
     if(sendData.followUpDays){
       var veh=inventory.find(function(v){return v.vin===vin;});
@@ -1997,6 +2058,7 @@ export default function App() {
       {showSoldArchive&&<SoldArchive th={th} videos={videos} sentLog={sentLog} inventory={inventory} archivedVins={archivedVins} onClose={function(){setShowSoldArchive(false);}}/>}
       <ManagerDash th={th} user={user} videos={videos} sentLog={sentLog} inventory={inventory}
         dealerId={storeId} dealerName={dealer.name||user.dealerName}
+        onSelectVehicle={function(vin){setSelectedVin(vin);setCurrentView("detail");}}
         onClose={function(){setCurrentView("inventory");}} onToast={showToast}
         onAdmin={function(){setShowAdmin(true);}}
         onWhiteLabel={function(){setShowWhiteLabel(true);}}
@@ -2103,7 +2165,7 @@ export default function App() {
           var d=SONIC_DEALERS.find(function(x){return x.id===newStoreId;});
           showToast("Now viewing: "+(d?d.name:newStoreId));
         }} style={{...inp(th),padding:"8px 10px",fontSize:13}}>
-          {SONIC_DEALERS.map(function(d){return <option key={d.id} value={d.id}>{d.name} — {d.city}</option>;})}
+          {availableDealers().map(function(d){return <option key={d.id} value={d.id}>{d.name} — {d.city}</option>;})}
         </select>
         <div style={{fontSize:11,color:th.faint,marginTop:6}}>Switches the inventory/data store for every role view below.</div>
       </div>
@@ -2137,6 +2199,18 @@ export default function App() {
       wlSettings={wlSettings}
       notifCount={unreadCount}
       onRefresh={function(){loadInventory(storeId);}}
+      onSwitchStore={function(){
+        var avail=PILOT_STORE_IDS.slice();
+        var canBoth=(user.stores||[]).length>1||isManager(user);
+        // Build the cycle: each store, then "both" (if allowed)
+        var cycle=avail.slice(); if(canBoth)cycle.push(BOTH_STORES);
+        var cur=user.activeStore||user.dealerId;
+        var i=cycle.indexOf(cur); if(i===-1)i=0;
+        var next=cycle[(i+1)%cycle.length];
+        var nu=Object.assign({},user,{activeStore:next,
+          dealerName:next===BOTH_STORES?"Both Stores":(SONIC_DEALERS.find(function(d){return d.id===next;})||{}).name||user.dealerName});
+        setUser(nu); saveSession(nu);
+      }}
       onSelectVehicle={function(vin){setSelectedVin(vin);setCurrentView("detail");}}
       onViewSentLog={function(vin){setSelectedVin(vin);setCurrentView("detail");}}
       onShootVehicle={function(vin){setSelectedVin(vin);setCurrentView("detail");}}

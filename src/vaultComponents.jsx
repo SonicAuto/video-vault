@@ -30,7 +30,7 @@ import {
   SONIC_DEALERS,
   SentLog,
   ShareComposer,
-  SONIC_LOGO,
+  storeLogo,
   SonicBadge,
   SuccessBox,
   TERMS_VERSION,
@@ -187,7 +187,7 @@ function CameraScreen(p) {
   var [elapsed,setElapsed]=useState(0);
   var [countdown,setCountdown]=useState(0);
   var [facing,setFacing]=useState("environment");
-  var [muted,setMuted]=useState(isAllPro(p.user));
+  var [muted,setMuted]=useState(true);
   var [torch,setTorch]=useState(false);
   var [grid,setGrid]=useState(false);
   var [videoType,setVT]=useState(p.defaultType||"Official");
@@ -578,7 +578,7 @@ function InventoryScreen(p) {
     <div style={{...hdr(th)}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
         <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-          <img src={SONIC_LOGO} alt="Sonic Automotive" style={{height:28,width:"auto"}}/>
+          <img src={storeLogo(user.activeStore||user.dealerId)} alt={user.dealerName||"Massey Cadillac"} style={{height:30,width:"auto"}}/>
           <div style={{minWidth:0}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,letterSpacing:2,color:th.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>VIDEO VAULT</div>
             <button onClick={function(){p.onSwitchStore&&p.onSwitchStore();}} style={{background:"transparent",border:"none",cursor:"pointer",padding:0,textAlign:"left",display:"flex",alignItems:"center",gap:4}}>
@@ -699,6 +699,7 @@ function InventoryScreen(p) {
               <div style={{fontSize:11,color:th.muted,marginBottom:5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v.trim} · {v.color}</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:3,background:tc+"18",border:"1px solid "+tc+"33",color:tc}}>{v.type}</span>
+                {v._store&&<span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:3,background:"#c084fc18",border:"1px solid #c084fc33",color:"#c084fc"}}>{v._store==="massey-cadillac-south-orlando"?"S. Orlando":"Orlando"}</span>}
                 {v.miles>0&&<span style={{fontSize:9,color:th.muted}}>{fmtMiles(v.miles)}</span>}
                 <DaysBadge days={v.daysOnLot||0}/>
                 {hasOff&&<span style={{fontSize:9,fontWeight:700,color:"#00d97e",background:"#00d97e12",border:"1px solid #00d97e33",padding:"2px 6px",borderRadius:3}}>✓ Complete</span>}
@@ -808,7 +809,7 @@ function VehicleDetail(p) {
   // Request video (sales → All-Pro)
   function sendRequest(){
     p.onRequest&&p.onRequest(vehicle.vin);
-    p.onToast("📷 Video request sent to All-Pro!");
+    p.onToast("📷 Video request sent!");
   }
 
   if(showCam)return <CameraScreen th={th} user={user} vehicle={vehicle} defaultType={camType} onClose={function(){setShowCam(false);}} onSave={function(vid){p.onSaveVideo(vehicle.vin,vid);setShowCam(false);p.onToast("Video saved!");}} />;
@@ -995,7 +996,7 @@ function VehicleDetail(p) {
         {vids.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:th.faint}}>
           <div style={{fontSize:44,marginBottom:10}}>🎬</div>
           <div style={{marginBottom:12}}>No videos yet</div>
-          {!IS_AP&&!hasOff&&<button onClick={sendRequest} style={{background:"#ff6b3518",border:"1px solid #ff6b3533",color:"#ff6b35",padding:"8px 18px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Barlow',sans-serif"}}>🎯 Request Official from All-Pro</button>}
+          {!IS_AP&&!hasOff&&<button onClick={sendRequest} style={{background:"#ff6b3518",border:"1px solid #ff6b3533",color:"#ff6b35",padding:"8px 18px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Barlow',sans-serif"}}>🎯 Request Video</button>}
         </div>}
       </div>
     </div>
@@ -1782,7 +1783,7 @@ function NotificationPrefs(p) {
 
   var items=[
     {key:"flag",label:"Video flagged for reshoot",desc:"When QC flags one of your videos"},
-    {key:"request",label:"Video shoot requested",desc:"When sales requests an Official video (All-Pro)"},
+    {key:"request",label:"Video shoot requested",desc:"When sales requests a video"},
     {key:"new_video",label:"New Official video added",desc:"When a car you recently viewed gets an Official video"},
     {key:"inactivity",label:"Inactivity reminder",desc:"When you haven't sent a video in "+INACTIVITY_DAYS+" days"},
     {key:"coverage",label:"Low coverage alert",desc:"When store Official video coverage drops below 70%"},
@@ -1851,7 +1852,7 @@ function ActiveSessions(p) {
 // ─── White Label Settings ──────────────────────────────────────────────────────
 function WhiteLabelSettings(p) {
   var th=p.th;
-  var [settings,setSettings]=useState(Object.assign({logoUrl:"",accentColor:"#e8313a",groupName:"Sonic Automotive",showPoweredBy:true},_db.whiteLabelSettings||{}));
+  var [settings,setSettings]=useState(Object.assign({logoUrl:"",accentColor:"#e8313a",groupName:"Massey Cadillac",showPoweredBy:true},_db.whiteLabelSettings||{}));
   var [saved,setSaved]=useState(false);
 
   function save(){
@@ -1877,7 +1878,7 @@ function WhiteLabelSettings(p) {
 
       {/* Group name */}
       <span style={lbl(th)}>Dealer Group Name</span>
-      <input style={inp(th)} placeholder="e.g. Sonic Automotive" value={settings.groupName} onChange={function(e){setSettings(function(s){return Object.assign({},s,{groupName:e.target.value});});}}/>
+      <input style={inp(th)} placeholder="e.g. Massey Cadillac" value={settings.groupName} onChange={function(e){setSettings(function(s){return Object.assign({},s,{groupName:e.target.value});});}}/>
 
       {/* Logo URL */}
       <span style={lbl(th)}>Logo Image URL (optional)</span>
