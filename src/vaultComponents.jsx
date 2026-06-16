@@ -876,6 +876,12 @@ function VehicleDetail(p) {
           <div style={{fontSize:15,color:th.muted,textAlign:"center",lineHeight:1.6}}>Demo mode — video preview not available.</div>
           <div style={{fontSize:12,color:th.faint,textAlign:"center"}}>Real videos will play here once uploaded by photographers.</div>
         </div>
+      ):!playVid.blob?(
+        <div style={{flex:1,background:"#141720",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,padding:40}}>
+          <div style={{fontSize:48}}>📭</div>
+          <div style={{fontSize:15,color:th.muted,textAlign:"center",lineHeight:1.6}}>This video isn't available on this device.</div>
+          <div style={{fontSize:12,color:th.faint,textAlign:"center",lineHeight:1.5}}>Videos are saved on the device that recorded them. Open it on that device, or have the photographer re-upload.</div>
+        </div>
       ):playVid.videoType==="Photo"?(
         <div style={{flex:1,background:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
           <img src={URL.createObjectURL(playVid.blob)} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}}/>
